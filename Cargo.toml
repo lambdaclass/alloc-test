@@ -1,9 +1,13 @@
 [package]
 name = "tracing-allocator"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+derive_builder = "0.11.2"
 derive_more = { version = "0.99.17", features = ["display"], default-features = false }
+num = "0.4.0"
+serde = { version = "1.0.146", features = ["derive"] }
+thiserror = "1.0.37"
