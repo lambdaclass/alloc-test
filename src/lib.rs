@@ -357,3 +357,9 @@ pub mod cmp {
         }
     }
 }
+
+#[cfg(feature = "benchmark")]
+mod benchmark;
+
+#[cfg(feature = "benchmark")]
+pub use benchmark::*;
