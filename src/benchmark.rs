@@ -12,7 +12,7 @@ const DIR: &str = "mem_bench";
 
 #[derive(Debug, Parser)]
 struct MemBenchArgs {
-    #[arg(short, long, value_name = "DIR")]
+    #[arg(short, long, value_name = "DIR", env)]
     load_baseline: Option<PathBuf>,
     #[arg(short, long, value_name = "DIR")]
     save_baseline: Option<PathBuf>,
@@ -21,7 +21,7 @@ struct MemBenchArgs {
 }
 
 fn parse_args() -> MemBenchArgs {
-    MemBenchArgs::parse_from(env::args().skip_while(|a| a != "--").skip(1))
+    MemBenchArgs::parse_from(env::args().skip_while(|a| a != "--"))
 }
 
 fn load_stats(path: &Path) -> Option<MemoryStats> {
@@ -85,13 +85,14 @@ fn default_dir() -> PathBuf {
 
 pub fn mem_bench<F: FnOnce() -> O, O>(id: &str, limits: &AllocLimits, f: F) -> MemoryStats {
     let args = parse_args();
-    let ref_stats = if !args.discard_baseline {
-        load_stats(&baseline_file(
-            &args.load_baseline.unwrap_or_else(default_dir),
-            id,
-        ))
+    let ref_stats = if let Some(load_baseline) = &args.load_baseline {
+        Some(
+            load_stats(&baseline_file(load_baseline, id)).unwrap_or_else(|| {
+                panic!("cannot load baseline from {load_baseline:?}: file not found")
+            }),
+        )
     } else {
-        None
+        load_stats(&baseline_file(&default_dir(), id))
     };
 
     let (_, stats) = trace_allocs(f);
@@ -102,13 +103,14 @@ pub fn mem_bench<F: FnOnce() -> O, O>(id: &str, limits: &AllocLimits, f: F) -> M
             .unwrap_or_else(|e| panic!("regression in test `{id}` detected: {e}"));
     }
 
-    if !args.discard_baseline {
+    if !args.discard_baseline && args.load_baseline.is_none() {
         store_stats(
             &stats,
             &baseline_file(&args.save_baseline.unwrap_or_else(default_dir), id),
         )
     }
 
+    println!("memory allocation stats for `{id}`:\n{stats}\n");
+
     stats
 }
-
