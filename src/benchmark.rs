@@ -1,13 +1,12 @@
 use std::{
-    env,
-    fs, io,
+    env, fs, io,
     path::{Path, PathBuf},
     process::Command,
 };
 
+use crate::{cmp::AllocLimits, trace_allocs, MemoryStats};
 use clap::Parser;
 use serde::Deserialize;
-use crate::{cmp::AllocLimits, trace_allocs, MemoryStats};
 
 const DIR: &str = "mem_bench";
 
@@ -42,8 +41,9 @@ fn store_stats(stats: &MemoryStats, path: &Path) {
 
     match path.parent() {
         None => unreachable!("cannot gen parent of {path:?}"),
-        Some(p) if !p.exists() => fs::create_dir_all(p)
-            .unwrap_or_else(|e| panic!("cannot create directory {p:?}: {e}")),
+        Some(p) if !p.exists() => {
+            fs::create_dir_all(p).unwrap_or_else(|e| panic!("cannot create directory {p:?}: {e}"))
+        }
         _ => {}
     }
 
@@ -83,7 +83,7 @@ fn default_dir() -> PathBuf {
         .join(DIR)
 }
 
-pub fn mem_bench<F: FnOnce() -> O, O>(id: &str, limits: &AllocLimits, f: F) {
+pub fn mem_bench<F: FnOnce() -> O, O>(id: &str, limits: &AllocLimits, f: F) -> MemoryStats {
     let args = parse_args();
     let ref_stats = if !args.discard_baseline {
         load_stats(&baseline_file(
@@ -108,4 +108,7 @@ pub fn mem_bench<F: FnOnce() -> O, O>(id: &str, limits: &AllocLimits, f: F) {
             &baseline_file(&args.save_baseline.unwrap_or_else(default_dir), id),
         )
     }
+
+    stats
 }
+
