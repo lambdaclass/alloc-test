@@ -135,9 +135,54 @@ pub fn mem_bench<F: FnOnce() -> O, O>(
     Ok(stats)
 }
 
+pub fn mem_bench_cmp_with_toml<F: FnOnce() -> O, O>(
+    id: &str,
+    ref_stats_toml: Option<&str>,
+    limits: &AllocLimits,
+    toml_log: bool,
+    f: F,
+) -> Result<MemoryStats, BenchmarkError> {
+    let (_, stats) = trace_allocs(f);
+    let ref_stats = ref_stats_toml.map(|s| toml::from_str(s)).transpose()?;
+
+    if let Some(ref_stats) = ref_stats {
+        limits.check(&stats, &ref_stats)?;
+    }
+
+    if toml_log {
+        #[cfg(not(target_family = "wasm"))]
+        println!(
+            "memory allocation stats for `{id}`:\n{stats}\n",
+            stats = toml::to_string(&stats).unwrap()
+        );
+        #[cfg(target_family = "wasm")]
+        wasm_bindgen_test::console_log!(
+            "memory allocation stats for `{id}`:\n{stats}\n",
+            stats = toml::to_string(&stats).unwrap()
+        );
+    } else {
+        #[cfg(not(target_family = "wasm"))]
+        println!("memory allocation stats for `{id}`:\n{stats}\n");
+        #[cfg(target_family = "wasm")]
+        wasm_bindgen_test::console_log!("memory allocation stats for `{id}`:\n{stats}\n");
+    }
+
+    Ok(stats)
+}
+
 #[macro_export]
 macro_rules! mem_bench {
     ($test:ident, $limits:expr) => {
         crate::mem_bench(stringify!($test), $limits, $test)
+    };
+}
+
+#[macro_export]
+macro_rules! mem_bench_cmp_with_toml {
+    ($test:ident, $toml:expr, $limits:expr $(,)?) => {
+        mem_bench_cmp_with_toml(stringify!($test), $toml, $limits, false, $test)
+    };
+    ($test:ident, $toml:expr, $limits:expr, $toml_log:expr $(,)?) => {
+        mem_bench_cmp_with_toml(stringify!($test), $toml, $limits, $toml_log, $test)
     };
 }
