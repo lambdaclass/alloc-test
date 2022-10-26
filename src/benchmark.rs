@@ -31,6 +31,21 @@ struct MemBenchArgs {
 }
 
 fn parse_args() -> MemBenchArgs {
+    let (test_n, exact) =
+        env::args()
+            .skip(1)
+            .take_while(|a| a != "--")
+            .fold((0, false), |(n, e), a| match a.as_str() {
+                "--exact" => (n, true),
+                _ if !a.starts_with("-") => (n + 1, e),
+                _ => (n, e),
+            });
+    if test_n != 1 {
+        panic!("specify exactly one test to run");
+    }
+    if !exact {
+        panic!("make sure only one test is executed by adding `--exact` parameter")
+    }
     // TODO replace argv[0] with something sensible
     MemBenchArgs::parse_from(env::args().skip_while(|a| a != "--"))
 }
