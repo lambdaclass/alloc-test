@@ -119,3 +119,10 @@ pub fn mem_bench<F: FnOnce() -> O, O>(
 
     Ok(stats)
 }
+
+#[macro_export]
+macro_rules! mem_bench {
+    ($test:ident, $limits:expr) => {
+        crate::mem_bench(stringify!($test), $limits, $test)
+    };
+}
