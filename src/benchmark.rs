@@ -10,6 +10,16 @@ use serde::Deserialize;
 
 const DIR: &str = "mem_bench";
 
+#[derive(Debug, thiserror::Error)]
+pub enum BenchmarkError {
+    #[error("regression detected: {_0}")]
+    Regression(#[from] crate::cmp::AllocLimitsError),
+    #[error(transparent)]
+    IO(#[from] io::Error),
+    #[error(transparent)]
+    Decode(#[from] toml::de::Error),
+}
+
 #[derive(Debug, Parser)]
 struct MemBenchArgs {
     #[arg(short, long, value_name = "DIR", env)]
@@ -21,36 +31,33 @@ struct MemBenchArgs {
 }
 
 fn parse_args() -> MemBenchArgs {
+    // TODO replace argv[0] with something sensible
     MemBenchArgs::parse_from(env::args().skip_while(|a| a != "--"))
 }
 
-fn load_stats(path: &Path) -> Option<MemoryStats> {
+fn load_stats(path: &Path, fail_on_not_found: bool) -> Result<Option<MemoryStats>, BenchmarkError> {
     let content = match fs::read_to_string(path) {
         Ok(v) => v,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return None,
-        Err(e) => panic!("cannot load stats from {path:?}: {e}"),
+        Err(e) if !fail_on_not_found && e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e.into()),
     };
-    let v = toml::from_str(&content)
-        .unwrap_or_else(|e| panic!("cannot parse stats from {path:?}: {e}"));
-    Some(v)
+    let v = toml::from_str(&content)?;
+    Ok(Some(v))
 }
 
-fn store_stats(stats: &MemoryStats, path: &Path) {
+fn store_stats(stats: &MemoryStats, path: &Path) -> Result<(), BenchmarkError> {
+    // shouldn't panic unless `MemoryStats` contains unsupported data types
     let stats = toml::to_string(stats)
-        .unwrap_or_else(|e| panic!("cannot unparse stats into {path:?}: {e}"));
+        .unwrap_or_else(|e| unreachable!("cannot unparse stats into toml: {e}\ndata: {stats:#?}"));
 
     match path.parent() {
         None => unreachable!("cannot gen parent of {path:?}"),
-        Some(p) if !p.exists() => {
-            fs::create_dir_all(p).unwrap_or_else(|e| panic!("cannot create directory {p:?}: {e}"))
-        }
+        Some(p) if !p.exists() => fs::create_dir_all(p)?,
         _ => {}
     }
 
-    println!("storing stats as {path:?}");
-
-    fs::write(path, stats.as_bytes())
-        .unwrap_or_else(|e| panic!("cannot store stats into {path:?}: {e}"));
+    fs::write(path, stats.as_bytes())?;
+    Ok(())
 }
 
 fn baseline_file(path: &Path, id: &str) -> PathBuf {
@@ -83,34 +90,32 @@ fn default_dir() -> PathBuf {
         .join(DIR)
 }
 
-pub fn mem_bench<F: FnOnce() -> O, O>(id: &str, limits: &AllocLimits, f: F) -> MemoryStats {
+pub fn mem_bench<F: FnOnce() -> O, O>(
+    id: &str,
+    limits: &AllocLimits,
+    f: F,
+) -> Result<MemoryStats, BenchmarkError> {
     let args = parse_args();
     let ref_stats = if let Some(load_baseline) = &args.load_baseline {
-        Some(
-            load_stats(&baseline_file(load_baseline, id)).unwrap_or_else(|| {
-                panic!("cannot load baseline from {load_baseline:?}: file not found")
-            }),
-        )
+        load_stats(&baseline_file(load_baseline, id), true)?
     } else {
-        load_stats(&baseline_file(&default_dir(), id))
+        load_stats(&baseline_file(&default_dir(), id), false)?
     };
 
     let (_, stats) = trace_allocs(f);
 
     if let Some(ref_stats) = ref_stats {
-        limits
-            .check(&stats, &ref_stats)
-            .unwrap_or_else(|e| panic!("regression in test `{id}` detected: {e}"));
+        limits.check(&stats, &ref_stats)?;
     }
 
     if !args.discard_baseline && args.load_baseline.is_none() {
         store_stats(
             &stats,
             &baseline_file(&args.save_baseline.unwrap_or_else(default_dir), id),
-        )
+        )?;
     }
 
     println!("memory allocation stats for `{id}`:\n{stats}\n");
 
-    stats
+    Ok(stats)
 }
