@@ -135,6 +135,17 @@ pub fn mem_bench<F: FnOnce() -> O, O>(
     Ok(stats)
 }
 
+macro_rules! log {
+    ($($tt:tt)*) => {
+        {
+            #[cfg(not(target_family = "wasm"))]
+            println!($($tt)*);
+            #[cfg(target_family = "wasm")]
+            wasm_bindgen_test::console_log!($($tt)*);
+        }
+    };
+}
+
 pub fn mem_bench_cmp_with_toml<F: FnOnce() -> O, O>(
     id: &str,
     ref_stats_toml: Option<&str>,
@@ -150,21 +161,12 @@ pub fn mem_bench_cmp_with_toml<F: FnOnce() -> O, O>(
     }
 
     if toml_log {
-        #[cfg(not(target_family = "wasm"))]
-        println!(
-            "memory allocation stats for `{id}`:\n{stats}\n",
-            stats = toml::to_string(&stats).unwrap()
-        );
-        #[cfg(target_family = "wasm")]
-        wasm_bindgen_test::console_log!(
+        log!(
             "memory allocation stats for `{id}`:\n{stats}\n",
             stats = toml::to_string(&stats).unwrap()
         );
     } else {
-        #[cfg(not(target_family = "wasm"))]
-        println!("memory allocation stats for `{id}`:\n{stats}\n");
-        #[cfg(target_family = "wasm")]
-        wasm_bindgen_test::console_log!("memory allocation stats for `{id}`:\n{stats}\n");
+        log!("memory allocation stats for `{id}`:\n{stats}\n");
     }
 
     Ok(stats)
