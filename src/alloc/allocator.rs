@@ -7,7 +7,7 @@ where
 
 impl<H, A> TracingAllocator<H, A>
 where
-    A: GlobalAlloc
+    A: GlobalAlloc,
 {
     pub const fn new(hooks: H, allocator: A) -> Self {
         TracingAllocator(allocator, hooks)

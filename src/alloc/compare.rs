@@ -28,17 +28,23 @@ pub struct AllocThresholdsError {
 
 macro_rules! check {
     ($f:ident, $l:expr, $v:expr, $r:expr) => {
-        $l.$f.check(&$v.$f, &$r.$f).map_err(|e| AllocThresholdsError {
-            error: e,
-            param: stringify!($f),
-        })
+        $l.$f
+            .check(&$v.$f, &$r.$f)
+            .map_err(|e| AllocThresholdsError {
+                error: e,
+                param: stringify!($f),
+            })
     };
 }
 
 impl ThresholdFor<MemoryStats> for AllocThresholds {
     type Error = AllocThresholdsError;
 
-    fn check_threshold(&self, value: &MemoryStats, ref_value: &MemoryStats) -> Result<(), Self::Error> {
+    fn check_threshold(
+        &self,
+        value: &MemoryStats,
+        ref_value: &MemoryStats,
+    ) -> Result<(), Self::Error> {
         self.check(value, ref_value)
     }
 }

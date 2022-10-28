@@ -76,10 +76,26 @@ export function performance_now() {
 }
 
 #[derive(Debug, Default)]
-pub struct Stats {
+struct Stats {
     n: f64,
     mean: f64,
     q: f64,
+}
+
+#[derive(Debug, Default, Display, Serialize, Deserialize)]
+#[display(fmt = "mean = {mean}μs")]
+pub struct PerfStats {
+    pub mean: u64,
+}
+
+impl From<Stats> for PerfStats {
+    fn from(source: Stats) -> Self {
+        let mean = Duration::from_secs_f64(source.mean)
+            .as_micros()
+            .try_into()
+            .unwrap();
+        PerfStats { mean }
+    }
 }
 
 impl std::fmt::Display for Stats {
@@ -108,16 +124,16 @@ impl Stats {
 
 const ITERS: (usize, usize) = (20, 5);
 
-pub fn bench<O, F: Fn() -> O>(f: F) -> Stats {
+pub fn bench<O, F: Fn() -> O>(f: F) -> PerfStats {
     bench_internal(ITERS.0, ITERS.1, &f)
 }
 
-pub fn bench_iters<O, F: Fn() -> O>(iters: usize, f: F) -> Stats {
+pub fn bench_iters<O, F: Fn() -> O>(iters: usize, f: F) -> PerfStats {
     bench_internal(iters, iters / 10, &f)
 }
 
-fn bench_internal<O, F: Fn() -> O>(iters: usize, wu_cd_iters: usize, f: &F) -> Stats {
-    assert!(iters > 20, "Number of iterations is too low");
+fn bench_internal<O, F: Fn() -> O>(iters: usize, wu_cd_iters: usize, f: &F) -> PerfStats {
+    assert!(iters >= 20, "Number of iterations is too low");
     assert!(iters / wu_cd_iters > 3, "Warm-up/cool-down is too long");
     let mut stats = Stats::new();
     for i in 0..iters {
@@ -126,10 +142,13 @@ fn bench_internal<O, F: Fn() -> O>(iters: usize, wu_cd_iters: usize, f: &F) -> S
             stats.update(time);
         }
     }
-    stats
+    stats.into()
 }
 
 use std::time::Duration;
+
+use derive_more::Display;
+use serde::{Deserialize, Serialize};
 
 pub fn duration_of<F: Fn() -> O, O>(f: F) -> Duration {
     let then = Instant::now();

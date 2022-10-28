@@ -4,7 +4,6 @@
 // #[cfg(feature = "benchmark")]
 // pub use benchmark::*;
 
-
 macro_rules! log {
     ($($tt:tt)*) => {
         {
@@ -16,9 +15,6 @@ macro_rules! log {
     };
 }
 
-
-mod common;
-pub mod threshold;
-pub mod perf;
 pub mod alloc;
-
+pub mod perf;
+pub mod threshold;

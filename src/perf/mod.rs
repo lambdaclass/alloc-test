@@ -1,3 +1,3 @@
-pub mod measure;
-pub mod compare;
 pub mod benchmark;
+pub mod compare;
+pub mod measure;

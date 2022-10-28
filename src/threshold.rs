@@ -295,5 +295,4 @@ mod tests {
 
         println!("{}", l.check(&111, &r).unwrap_err());
     }
-
 }
